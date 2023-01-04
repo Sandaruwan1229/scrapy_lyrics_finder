@@ -1,27 +1,40 @@
 from scrapy.spiders import SitemapSpider
+import re
 
 
 class LyricsSpider(SitemapSpider):
-    # name = "lyrics"
-    # allowed_domains = ['sinhalasonglyrics.com']
-    # sitemap_urls = [
-    #     'https://sinhalasonglyrics.com/sitemap.xml'
-    # ]
     name = "lyrics"
-    allowed_domains = ['lyricslk.com']
+    allowed_domains = ['sinhalasonglyrics.com']
     sitemap_urls = [
-        'http://lyricslk.com/sitemap.xml'
+        "https://sinhalasonglyrics.com/sitemap-index-1.xml",
+        "https://sinhalasonglyrics.com/sitemap-2.xml"
     ]
-    sitemap_rules = [('^(?!.*artist).*$', 'parse')]
+    artists = ["centigradz"]
+    # artists = ["dhanith-sri", "supun-perera", "ridma-weerawardana", "kanchana-anuradhi", "dinesh-gamage", "dinupa-kodagoda", "yasas-madagedara", "charitha-attalage", "bashi-devanga", "sadara-bandara"]
+    sitemap_rules = [(".*" + artist + ".*", 'parse') for artist in artists]
 
     def parse(self, response):
-        song_lines = response.xpath('//*[@id="lyricsBody"]/text()').getall()
+        ## retrieve lyrics
+        song_lines = response.xpath('//div[@class="entry-content e-content"]/p').getall()
         song = ''
         for line in song_lines:
-            song_line = line.split('\n')[1].strip()
-            song = song + " " + song_line
+            line = line.replace("<p>", "")
+            line = line.replace("</p>", "")
+            line = line.replace("<br>", "")
+            line = re.sub("<strong>.*</strong>", "" , line)
+            line = re.sub("<a href.*</a>", "" , line)
+            song = song + " " + line
+
+        ## retrieve song title and singer
+        url = response.request.url
+        metadata_start = url.index(self.allowed_domains[0])
+        metadata_end = metadata_start + len(self.allowed_domains[0])
+        metadata = url[metadata_end + 1: -1]
+        title, singer = metadata.split("-by-")
+        singer = singer.replace("-", " ")
+        title = title.replace("-", " ")
         yield {
-            'title': response.xpath('//*[@id="lyricsTitle"]/h2/text()')[0].get().split(' - ')[0],
-            'singer': response.xpath('//*[@id="lyricsTitle"]/h2/text()')[0].get().split(' - ')[1],
-            'song': song
+            'title': title,
+            'singer': singer,
+            'song' : song,
         }
